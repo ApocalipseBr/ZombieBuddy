@@ -2,6 +2,7 @@ package me.zed_0xff.zombie_buddy.patches;
 
 import me.zed_0xff.zombie_buddy.annotations.Patch;
 import me.zed_0xff.zombie_buddy.Loader;
+import me.zed_0xff.zombie_buddy.LauncherModTemplate;
 import me.zed_0xff.zombie_buddy.Logger;
 
 import java.io.IOException;
@@ -31,7 +32,9 @@ public class Patch_ZomboidFileSystem {
     @Patch(className = "zombie.ZomboidFileSystem", methodName = "loadMods")
     public class Patch_loadMods2 {
         @Patch.OnEnter
-        public static void enter(List<String> toLoad, @Patch.Local("t0") long t0) {
+        public static void enter(@Patch.Argument(value = 0, readOnly = false) List<String> toLoad,
+                                 @Patch.Local("t0") long t0) {
+            toLoad = LauncherModTemplate.forSession(toLoad);
             Logger.info("ZomboidFileSystem.loadMods(" + toLoad.size() + " mods) ...");
             long loaderStartNs = System.nanoTime();
 

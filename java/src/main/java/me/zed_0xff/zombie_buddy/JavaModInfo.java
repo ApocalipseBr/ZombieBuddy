@@ -44,6 +44,11 @@ record JavaModInfo(
         WorkshopItemID id = workshopItemIdFromSteamPath(path);
         if (id != null) return id;
 
+        if (LauncherModTemplate.isViewpoint() && path.getParent() != null) {
+            id = LauncherModTemplate.workshopItemId(path.getParent().getParent());
+            if (id != null) return id;
+        }
+
         Path p = path.getParent();
         int depth = 4;                     // XXX assume B41 java-mods live in /41 subdir
         while (p != null && depth > 0) {
@@ -76,7 +81,7 @@ record JavaModInfo(
         return null;
     }
 
-    private static WorkshopItemID workshopItemIdFromWorkshopTxtIn(Path dir) {
+    static WorkshopItemID workshopItemIdFromWorkshopTxtIn(Path dir) {
         Path workshopTxt = dir.resolve("workshop.txt");
         if (!Files.isRegularFile(workshopTxt)) {
             return null;

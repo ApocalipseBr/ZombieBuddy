@@ -711,6 +711,7 @@ public class Loader {
         Boolean isB42 = null;
         for (String mod_id : mergedIds) {
             if (Utils.isBlank(mod_id)) continue;
+            if ("ZombieBuddy".equals(mod_id) && LauncherModTemplate.isViewpoint()) continue;
             if (processedIds.contains(mod_id)) continue;
             processedIds.add(mod_id);
 

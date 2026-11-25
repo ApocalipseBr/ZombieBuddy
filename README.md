@@ -51,6 +51,10 @@ Previously, Java mods for Project Zomboid required bundling `.class` files and m
 
 ## Documentation
 
+The Apocalipse BR launcher passes `-Dapocbr.launcher.template=viewpoint` to apply its staged
+ZombieBuddy, Viewpoint, and PZVoxelStudioViewpoint mods to the local session. The hook preserves the
+saved mod lists and uses the staged Workshop IDs for Java mod approval.
+
 | Document | Description |
 |----------|-------------|
 | [Installation Guide](doc/Installation.md) | End-user installation, security, and policy configuration |
