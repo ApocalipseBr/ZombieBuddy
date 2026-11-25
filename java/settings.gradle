@@ -1,3 +1,15 @@
+pluginManagement {
+    repositories {
+        // Prefer a public Maven Central mirror to avoid shared-runner rate limits.
+        maven {
+            name = 'GoogleMavenCentralMirror'
+            url = uri('https://maven-central.storage-download.googleapis.com/maven2/')
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 // plugins {
 //     // JDK path resolver from java.toolchain.languageVersion
 //     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
