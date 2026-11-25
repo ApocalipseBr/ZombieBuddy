@@ -1,0 +1,152 @@
+name: Release ZombieBuddy agent
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test agent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "9.8.0"
+
+      - name: Set up Project Zomboid compile classpath
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y lib32gcc-s1 libgl1 libglu1-mesa libxi6 libxrender1 libxtst6
+          steamcmd="$(mktemp -d "$RUNNER_TEMP/steamcmd.XXXXXX")"
+          pz_home="$(mktemp -d "$RUNNER_TEMP/pz-server.XXXXXX")"
+          mkdir -p "$RUNNER_TEMP/ci"
+          curl --fail --silent --show-error --location --retry 4 \
+            https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz |
+            tar -xz -C "$steamcmd"
+          pz_jar="$pz_home/java/projectzomboid.jar"
+          manifest="$pz_home/steamapps/appmanifest_380870.acf"
+          installed=false
+          for attempt in 1 2 3; do
+            if timeout 15m "$steamcmd/steamcmd.sh" +@sSteamCmdForcePlatformType linux \
+              +force_install_dir "$pz_home" +login anonymous +app_info_update 1 \
+              +app_update 380870 validate +quit | tee "$RUNNER_TEMP/ci/steamcmd-$attempt.log" &&
+              [[ -s "$pz_jar" && -d "$pz_home/media" && -d "$pz_home/linux64" && -s "$manifest" ]]; then
+              installed=true
+              break
+            fi
+            echo "::warning::SteamCMD attempt $attempt did not complete the dedicated-server installation."
+          done
+          if [[ "$installed" != true ]]; then
+            echo "::error::SteamCMD could not install the Linux dedicated server."
+            exit 1
+          fi
+          printf 'PZ_CLASSPATH=%s\n' "$pz_jar" >> "$GITHUB_ENV"
+          printf 'LD_LIBRARY_PATH=%s:%s/linux64:%s/java\n' \
+            "$pz_home" "$pz_home" "$pz_home" >> "$GITHUB_ENV"
+
+      - name: Generate release version
+        id: version
+        working-directory: java
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_version="$(tr -d '\r\n' < VERSION)"
+          if [[ ! "$base_version" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+([-+].*)?$ ]]; then
+            echo "::error::VERSION must start with a semantic version such as 3.0.0-beta3."
+            exit 1
+          fi
+          version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.$GITHUB_RUN_NUMBER"
+          printf '%s\n' "$version" > VERSION
+          printf 'value=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests and build shaded agent
+        working-directory: java
+        run: gradle --no-daemon test shadowJar -PgameClasspath="$PZ_CLASSPATH"
+
+      - name: Stage release assets
+        working-directory: java
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/release"
+          jar_file="$(find build/jdk25/libs -maxdepth 1 -type f \
+            -name 'ZombieBuddy*.jar' ! -name '*-plain.jar' -print -quit)"
+          if [[ -z "$jar_file" ]]; then
+            echo "::error::The shaded ZombieBuddy agent JAR was not produced."
+            exit 1
+          fi
+          cp "$jar_file" "$RUNNER_TEMP/release/ZombieBuddy.jar"
+          (cd "$RUNNER_TEMP/release" && sha256sum ZombieBuddy.jar > ZombieBuddy.jar.sha256)
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: zombiebuddy-release-${{ github.run_id }}
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/release/ZombieBuddy.jar
+            ${{ runner.temp }}/release/ZombieBuddy.jar.sha256
+
+  publish:
+    name: Publish latest GitHub release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: zombiebuddy-agent-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: zombiebuddy-release-${{ github.run_id }}
+          path: release
+
+      - name: Verify and publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd release && sha256sum --check ZombieBuddy.jar.sha256)
+          tag="v$RELEASE_VERSION"
+          title="ZombieBuddy $RELEASE_VERSION"
+          existing_tag="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag" |
+            jq -r --arg ref "refs/tags/$tag" '.[] | select(.ref == $ref) | .object.sha')"
+          if [[ -n "$existing_tag" && "$existing_tag" != "$GITHUB_SHA" ]]; then
+            echo "::error::Tag $tag already points to a different commit."
+            exit 1
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" release/ZombieBuddy.jar release/ZombieBuddy.jar.sha256 \
+              --repo "$GITHUB_REPOSITORY" --clobber
+            exit 0
+          fi
+          published_run="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" |
+            jq -s '[.[][] | select(.draft == false and .prerelease == false) | .tag_name |
+              capture("^v[0-9]+\\.[0-9]+\\.(?<run>[0-9]+)$").run | tonumber] | max // 0')"
+          if (( published_run >= GITHUB_RUN_NUMBER )); then
+            echo "Release run $published_run has already been published."
+            exit 0
+          fi
+          gh release create "$tag" release/ZombieBuddy.jar release/ZombieBuddy.jar.sha256 \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$title" --latest \
+            --notes "Built by [workflow run $GITHUB_RUN_NUMBER]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."

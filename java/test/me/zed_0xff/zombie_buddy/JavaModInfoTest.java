@@ -1,26 +1,31 @@
 package me.zed_0xff.zombie_buddy;
 
-import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 import static me.zed_0xff.zombie_buddy.SteamWorkshop.WorkshopItemID;
-import java.nio.file.Path;
 
 class JavaModInfoTest {
-    private static final String HOME_DIR  = System.getProperty("user.home");
-    private static final String CACHE_DIR = HOME_DIR + File.separator + "Zomboid";
+    @TempDir
+    Path tempDir;
 
+    private Path cachePath;
     private MockedStatic<Utils> utilsMock;
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
+        cachePath = tempDir.resolve("Zomboid");
+        Files.createDirectories(cachePath);
         utilsMock = mockStatic(Utils.class, CALLS_REAL_METHODS);
-        utilsMock.when(Utils::getCacheDir).thenReturn(CACHE_DIR);
-        utilsMock.when(Utils::getCachePath).thenReturn(Path.of(CACHE_DIR));
+        utilsMock.when(Utils::getCacheDir).thenReturn(cachePath.toString());
+        utilsMock.when(Utils::getCachePath).thenReturn(cachePath);
     }
 
     @AfterEach
@@ -29,22 +34,26 @@ class JavaModInfoTest {
     }
 
     @Test
-    void workshopItemIdFromInfPath_valid() {
+    void workshopItemIdFromInfPath_valid() throws IOException {
+        Path workshopDir = cachePath.resolve("Workshop/ZBExhume41");
+        Files.createDirectories(workshopDir);
+        Files.writeString(workshopDir.resolve("workshop.txt"), "id=3718604798\n");
+
         assertEquals(
                 new WorkshopItemID(3718604798L),
-                JavaModInfo.workshopItemIdFromInfPath( Path.of(CACHE_DIR, "Workshop/ZBExhume41/Contents/mods/ZBExhume41/common/mod.info"))
+                JavaModInfo.workshopItemIdFromInfPath(cachePath.resolve("Workshop/ZBExhume41/Contents/mods/ZBExhume41/common/mod.info"))
                 );
         assertEquals(
                 new WorkshopItemID(2986022978L),
-                JavaModInfo.workshopItemIdFromInfPath( Path.of(HOME_DIR, "/Library/Application Support/Steam/steamapps/workshop/content/108600/2986022978/mods/DoubleDeckerBusInterior"))
+                JavaModInfo.workshopItemIdFromInfPath(Path.of("steamapps", "workshop", "content", "108600", "2986022978", "mods", "DoubleDeckerBusInterior"))
                 );
     }
 
     @Test
     void workshopItemIdFromInfPath_invalid() {
-        assertNull( JavaModInfo.workshopItemIdFromInfPath( Path.of(CACHE_DIR, "Workshop/ZBExhume41/Contents/mods/ZBExhume41/common/foo/mod.info")));
-        assertNull( JavaModInfo.workshopItemIdFromInfPath( Path.of(CACHE_DIR, "Workshop/ZBExhume41/Contents/mods/ZBExhume41/mod.info")));
-        assertNull( JavaModInfo.workshopItemIdFromInfPath( Path.of(CACHE_DIR, "Workshop/ZBExhume41/Contents/mods/ZBExhume41/42.13/media/java/ZBExhume41.jar")));
+        assertNull(JavaModInfo.workshopItemIdFromInfPath(cachePath.resolve("Workshop/ZBExhume41/Contents/mods/ZBExhume41/common/foo/mod.info")));
+        assertNull(JavaModInfo.workshopItemIdFromInfPath(cachePath.resolve("Workshop/ZBExhume41/Contents/mods/ZBExhume41/mod.info")));
+        assertNull(JavaModInfo.workshopItemIdFromInfPath(cachePath.resolve("Workshop/ZBExhume41/Contents/mods/ZBExhume41/42.13/media/java/ZBExhume41.jar")));
         assertNull( JavaModInfo.workshopItemIdFromInfPath( Path.of("/etc/passwd")));
     }
 

@@ -105,6 +105,13 @@ This project is licensed under a permissive open-source license. See [LICENSE.tx
 
 Contributions are welcome! Please feel free to submit issues or pull requests.
 
+## Releasing the Java agent
+
+Every push to `master` builds and tests the agent against the Project Zomboid dedicated-server files.
+The workflow generates a version from the major/minor in `java/VERSION` and the GitHub Actions run
+number (for example, `3.0.0-beta3` becomes `3.0.<run number>`), then publishes `ZombieBuddy.jar` and
+its SHA-256 checksum as the latest GitHub Release.
+
 ## Links
 
 - **GitHub**: https://github.com/zed-0xff/ZombieBuddy
