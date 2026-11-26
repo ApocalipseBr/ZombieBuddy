@@ -573,7 +573,7 @@ public class Loader {
                         ? Pipeline.transformPatchJar(jarBytes, packageName)
                         : Pipeline.transformPatchJar(cacheKey, packageName);
                 modLoader = shouldMergePatchJar(cacheKey, jarBytes)
-                        ? ModJarInjector.injectMerged(transformed)
+                        ? ModJarInjector.injectMerged(transformed, g_instrumentation)
                         : ModJarInjector.inject(transformed);
                 g_mod_loaders.put(cacheKey, modLoader);
                 g_transformed_jars.put(cacheKey, transformed);

@@ -1,6 +1,7 @@
 package me.zed_0xff.zombie_buddy;
 
 import me.zed_0xff.zombie_buddy.transformers.TransformedJar;
+import net.bytebuddy.agent.ByteBuddyAgent;
 import net.bytebuddy.dynamic.loading.ClassInjector;
 import org.junit.jupiter.api.Test;
 import org.objectweb.asm.ClassWriter;
@@ -8,6 +9,7 @@ import org.objectweb.asm.Opcodes;
 
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -63,7 +65,7 @@ class ModJarInjectorTest {
     }
 
     @Test
-    void injectMergedDefinesSubtypeHashedBeforeSupertype() {
+    void injectMergedDefinesSubtypeHashedBeforeSupertype() throws Exception {
         // injectMerged collects the classes in a HashMap, so pick names whose hash order puts the
         // implementation first: unordered, it would be defined before its interface.
         String impl = null;
@@ -84,8 +86,29 @@ class ModJarInjectorTest {
         classes.put(impl, classBytes(impl, Opcodes.ACC_PUBLIC, "java.lang.Object", api));
         TransformedJar jar = new TransformedJar(classes, Map.of(), List.of(), null, null);
 
-        ClassLoader loader = ModJarInjector.injectMerged(jar);
+        ClassLoader loader = ModJarInjector.injectMerged(jar, null);
         String implName = impl;
         assertDoesNotThrow(() -> Class.forName(implName, false, loader));
+    }
+
+    @Test
+    void mergedClassesCanReadJarResourcesWithoutExposingUntransformedClasses() throws Exception {
+        String name = "zbtest.resources.Build";
+        String resource = "/zbtest/resources/build.properties";
+        byte[] properties = "version=1".getBytes(StandardCharsets.UTF_8);
+        byte[] hiddenClass = classBytes("zbtest.resources.Hidden", Opcodes.ACC_PUBLIC, "java.lang.Object");
+        var jar = new TransformedJar(
+                Map.of(name, classBytes(name, Opcodes.ACC_PUBLIC, "java.lang.Object")),
+                Map.of(resource.substring(1), properties, "zbtest/resources/Hidden.class", hiddenClass),
+                List.of(), null, null);
+
+        ClassLoader loader = ModJarInjector.injectMerged(jar, ByteBuddyAgent.install());
+        Class<?> build = loader.loadClass(name);
+
+        try (var stream = build.getResourceAsStream(resource)) {
+            assertNotNull(stream);
+            assertArrayEquals(properties, stream.readAllBytes());
+        }
+        assertThrows(ClassNotFoundException.class, () -> loader.loadClass("zbtest.resources.Hidden"));
     }
 }

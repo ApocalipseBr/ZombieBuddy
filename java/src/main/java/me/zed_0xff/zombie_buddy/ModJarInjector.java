@@ -1,5 +1,9 @@
 package me.zed_0xff.zombie_buddy;
 
+import java.io.IOException;
+import java.lang.instrument.Instrumentation;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -10,7 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
 
 import org.objectweb.asm.ClassReader;
 
@@ -42,7 +48,7 @@ final class ModJarInjector {
     }
 
     /** Define patch jars in the ZombieBuddy loader to keep patch/helper static state single. */
-    static ClassLoader injectMerged(TransformedJar jar) {
+    static ClassLoader injectMerged(TransformedJar jar, Instrumentation instrumentation) throws IOException {
         ClassLoader parent = parentLoader();
         if (!ClassInjector.UsingUnsafe.isAvailable()) {
             Logger.error("ClassInjector.UsingUnsafe not available; cannot define transformed jar in " + parent);
@@ -64,7 +70,45 @@ final class ModJarInjector {
             Logger.debug("Defined " + injected.size() + " transformed classes in " + parent);
         }
 
+        registerMergedResources(jar.resources(), instrumentation);
         return parent;
+    }
+
+    private static void registerMergedResources(Map<String, byte[]> resources, Instrumentation instrumentation)
+            throws IOException {
+        var entries = resources.entrySet().stream()
+                .filter(entry -> !entry.getKey().endsWith(".class")
+                        && !JarFile.MANIFEST_NAME.equalsIgnoreCase(entry.getKey()))
+                .toList();
+        if (entries.isEmpty()) {
+            return;
+        }
+        if (instrumentation == null) {
+            throw new IOException("Java instrumentation is unavailable for mod resources.");
+        }
+
+        // Merged classes use the system loader. Give it the resources without exposing original mod bytecode.
+        Path archive = Files.createTempFile("zombiebuddy-resources-", ".jar");
+        boolean registered = false;
+        try {
+            try (var output = new JarOutputStream(Files.newOutputStream(archive))) {
+                for (var entry : entries) {
+                    output.putNextEntry(new JarEntry(entry.getKey()));
+                    output.write(entry.getValue());
+                    output.closeEntry();
+                }
+            }
+            try (var resourceJar = new JarFile(archive.toFile())) {
+                instrumentation.appendToSystemClassLoaderSearch(resourceJar);
+                registered = true;
+            }
+        } finally {
+            if (registered) {
+                archive.toFile().deleteOnExit();
+            } else {
+                Files.deleteIfExists(archive);
+            }
+        }
     }
 
     /**

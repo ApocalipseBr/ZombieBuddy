@@ -55,6 +55,10 @@ The Apocalipse BR launcher passes `-Dapocbr.launcher.template=viewpoint` to appl
 ZombieBuddy, Viewpoint, and PZVoxelStudioViewpoint mods to the local session. The hook preserves the
 saved mod lists and uses the staged Workshop IDs for Java mod approval.
 
+Java mods loaded into the shared game class loader can read resources from their JARs. For
+example, Viewpoint reads `/viewpoint/build.properties` during startup. ZombieBuddy registers
+those resources alongside the transformed classes so normal Java resource lookup works.
+
 | Document | Description |
 |----------|-------------|
 | [Installation Guide](doc/Installation.md) | End-user installation, security, and policy configuration |
