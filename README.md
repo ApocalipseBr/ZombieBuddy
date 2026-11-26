@@ -54,10 +54,17 @@ Previously, Java mods for Project Zomboid required bundling `.class` files and m
 The Apocalipse BR launcher passes `-Dapocbr.launcher.template=viewpoint` to apply its staged
 ZombieBuddy, Viewpoint, and PZVoxelStudioViewpoint mods to the local session. The hook preserves the
 saved mod lists and uses the staged Workshop IDs for Java mod approval.
+For launcher-managed Viewpoint sessions, the launcher supplies the verified JAR SHA-256 digests
+in `apocbr.launcher.viewpoint.java.sha256`. The agent snapshots these values at startup and
+matches the mod ID, Workshop item, staged path, and digest before allowing the JAR for that session.
+The ordinary approval policy applies to other Java mods. The agent continues to check Steam bans
+and ZBS signatures under the configured policy.
 
 Java mods loaded into the shared game class loader can read resources from their JARs. For
 example, Viewpoint reads `/viewpoint/build.properties` during startup. ZombieBuddy registers
 those resources alongside the transformed classes so normal Java resource lookup works.
+Classes loaded from external mods also retain the original JAR's location in their Java
+protection domain. Viewpoint uses that location to find its Lua files beside the JAR.
 
 | Document | Description |
 |----------|-------------|

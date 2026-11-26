@@ -4,12 +4,15 @@ import me.zed_0xff.zombie_buddy.transformers.TransformedJar;
 import net.bytebuddy.agent.ByteBuddyAgent;
 import net.bytebuddy.dynamic.loading.ClassInjector;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -86,13 +89,14 @@ class ModJarInjectorTest {
         classes.put(impl, classBytes(impl, Opcodes.ACC_PUBLIC, "java.lang.Object", api));
         TransformedJar jar = new TransformedJar(classes, Map.of(), List.of(), null, null);
 
-        ClassLoader loader = ModJarInjector.injectMerged(jar, null);
+        ClassLoader loader = ModJarInjector.injectMerged(jar, null, null);
         String implName = impl;
         assertDoesNotThrow(() -> Class.forName(implName, false, loader));
     }
 
     @Test
-    void mergedClassesCanReadJarResourcesWithoutExposingUntransformedClasses() throws Exception {
+    void mergedClassesKeepTheirJarLocationAndCanReadResourcesWithoutExposingOriginalBytecode(@TempDir Path directory)
+            throws Exception {
         String name = "zbtest.resources.Build";
         String resource = "/zbtest/resources/build.properties";
         byte[] properties = "version=1".getBytes(StandardCharsets.UTF_8);
@@ -102,8 +106,11 @@ class ModJarInjectorTest {
                 Map.of(resource.substring(1), properties, "zbtest/resources/Hidden.class", hiddenClass),
                 List.of(), null, null);
 
-        ClassLoader loader = ModJarInjector.injectMerged(jar, ByteBuddyAgent.install());
+        Path modDirectory = Files.createDirectory(directory.resolve("Workshop mod ç"));
+        Path sourceJar = Files.createFile(modDirectory.resolve("Viewpoint.jar")).toRealPath();
+        ClassLoader loader = ModJarInjector.injectMerged(jar, sourceJar, ByteBuddyAgent.install());
         Class<?> build = loader.loadClass(name);
+        assertEquals(sourceJar, Path.of(build.getProtectionDomain().getCodeSource().getLocation().toURI()));
 
         try (var stream = build.getResourceAsStream(resource)) {
             assertNotNull(stream);

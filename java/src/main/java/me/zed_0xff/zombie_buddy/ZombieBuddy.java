@@ -11,6 +11,7 @@ import zombie.Lua.LuaManager;
 
 @Exposer.LuaClass
 public class ZombieBuddy {
+    public static final String DISPLAY_NAME = "Apocalipse [BR] ZombieBuddy";
     private static String version = "unknown";
     
     static {
@@ -36,7 +37,7 @@ public class ZombieBuddy {
     }
     
     public static String getFullVersionString() {
-        return "ZombieBuddy v" + version;
+        return DISPLAY_NAME + " v" + version;
     }
 
     public static void setAutoFixModOrder(boolean value) {

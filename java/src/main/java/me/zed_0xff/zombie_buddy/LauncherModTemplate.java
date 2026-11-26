@@ -50,9 +50,13 @@ public final class LauncherModTemplate {
         if (cache == null) {
             return null;
         }
-        Path templateMods = cache.resolve("Workshop/Apocalipse Launcher - Viewpoint/Contents/mods");
+        Path templateMods = stagedMods(cache);
         return Utils.isSameFile(modRoot.getParent(), templateMods)
             ? JavaModInfo.workshopItemIdFromWorkshopTxtIn(modRoot)
             : null;
+    }
+
+    static Path stagedMods(Path cache) {
+        return cache.resolve("Workshop/Apocalipse Launcher - Viewpoint/Contents/mods");
     }
 }

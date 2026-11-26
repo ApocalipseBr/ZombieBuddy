@@ -26,28 +26,28 @@ public final class ConsoleModApprovalFrontend implements ModApprovalFrontend {
         if (pending.isEmpty()) {
             return pending;
         }
-        Logger.info("Java mod approval (console): " + pending.size() + " mod(s). Answer y/n.");
+        Logger.info(ZombieBuddy.DISPLAY_NAME + " | Aprovação de mods Java (" + pending.size() + "). Responda s/n.");
         for (JarBatchApprovalProtocol.Entry e : pending) {
             System.out.println();
             System.out.println("---");
-            System.out.println("Mod id:    " + e.modId);
-            System.out.println("Workshop:  " + (e.workshopItemId != null ? e.workshopItemId.value() : "(none)"));
+            System.out.println("ID do mod:    " + e.modId);
+            System.out.println("Workshop:  " + (e.workshopItemId != null ? e.workshopItemId.value() : "(nenhum)"));
             System.out.println("JAR:       " + e.jarAbsolutePath);
             System.out.println("SHA-256:   " + e.sha256);
-            System.out.println("Updated:   " + formatDate(e.date));
-            System.out.println("ZBS valid: " + e.zbs.valid());
+            System.out.println("Atualizado:   " + formatDate(e.date));
+            System.out.println("ZBS válido: " + e.zbs.valid());
             if (!Utils.isBlank(e.zbs.notice())) {
-                System.out.println("ZBS note:  " + e.zbs.notice());
+                System.out.println("Detalhes da ZBS:  " + e.zbs.notice());
             }
             boolean allow;
             if (e.zbs.invalid()) {
-                System.out.println("ZBS invalid — load will be denied.");
+                System.out.println("O mod Java foi bloqueado porque a assinatura ZBS é inválida.");
                 allow = false;
             } else {
-                allow = readYesNo("Allow this Java mod to load?");
+                allow = readYesNo("Permitir o carregamento deste mod Java?");
             }
             e.decision = allow;
-            if (readYesNo("Save this decision to disk?")) {
+            if (readYesNo("Salvar esta decisão para as próximas sessões?")) {
                 e.flags = e.flags.with(MF_PERSIST);
             } else {
                 e.flags = e.flags.without(MF_PERSIST);
@@ -58,7 +58,7 @@ public final class ConsoleModApprovalFrontend implements ModApprovalFrontend {
 
     private boolean readYesNo(String prompt) {
         while (true) {
-            System.out.print(prompt + " [y/n]: ");
+            System.out.print(prompt + " [s/n]: ");
             System.out.flush();
             String line;
             try {
@@ -74,19 +74,19 @@ public final class ConsoleModApprovalFrontend implements ModApprovalFrontend {
             if (s.isEmpty()) {
                 continue;
             }
-            if (s.startsWith("y")) {
+            if (s.startsWith("s") || s.startsWith("y")) {
                 return true;
             }
             if (s.startsWith("n")) {
                 return false;
             }
-            System.out.println("Please answer y or n.");
+            System.out.println("Responda s para sim ou n para não.");
         }
     }
 
     private static String formatDate(Date date) {
         if (date == null) {
-            return "(unknown)";
+            return "(desconhecido)";
         }
         return new SimpleDateFormat(DATE_FORMAT, Locale.ROOT).format(date);
     }

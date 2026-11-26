@@ -22,7 +22,8 @@ public class Agent {
             return;
         }
 
-        Logger.info("activating " + ZombieBuddy.getFullVersionString());
+        Logger.info("Iniciando " + ZombieBuddy.getFullVersionString());
+        LauncherModTrust.initialize();
         Loader.g_instrumentation = inst;
         Reflect.init(inst);
 
@@ -133,7 +134,7 @@ public class Agent {
         }
 
         Loader.initConfig();
-        Logger.info("Agent installed.");
+        Logger.info("Agente " + ZombieBuddy.DISPLAY_NAME + " carregado.");
 
         Logger.debug("system classloader: " + _systemLoader);
         Logger.debug("Agent  classloader: " + Agent.class.getClassLoader());

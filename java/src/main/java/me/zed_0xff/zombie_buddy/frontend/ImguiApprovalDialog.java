@@ -23,6 +23,7 @@ import me.zed_0xff.zombie_buddy.JarBatchApprovalProtocol;
 import me.zed_0xff.zombie_buddy.Logger;
 import me.zed_0xff.zombie_buddy.SteamWorkshop;
 import me.zed_0xff.zombie_buddy.Utils;
+import me.zed_0xff.zombie_buddy.ZombieBuddy;
 
 import imgui.ImColor;
 import imgui.ImDrawList;
@@ -42,11 +43,11 @@ import zombie.network.DesktopBrowser;
 
 final class ImguiApprovalDialog {
     private static final String DATE_FORMAT = "yyyy-MM-dd";
-    private static final String PRELOAD_NOTICE = "[Preload]";
+    private static final String PRELOAD_NOTICE = "[Pré-carregamento]";
     private static final String PRELOAD_TOOLTIP = String.join("\n",
-            "This mod wants ZombieBuddy to load its Java code during agent startup on the next launch.",
-            "Preloaded mods run before normal Project Zomboid mod loading.",
-            "This lets the mod hook earlier game code that is otherwise already loaded.");
+            "Este mod solicita que o agente carregue seu código Java na próxima inicialização.",
+            "Mods pré-carregados são executados antes dos outros mods do Project Zomboid.",
+            "Isso permite que o mod acesse o código do jogo mais cedo.");
     private static final int ROW_OK                     = ImColor.rgba(60, 110, 60, 80);
     private static final int ROW_BAD                    = ImColor.rgba(130, 55, 55, 95);
     private static final int STEAM_BAN_NO               = ImColor.rgb(0, 170, 70);
@@ -69,12 +70,12 @@ final class ImguiApprovalDialog {
     private static final int COL_IDX_TRUST_AUTHOR       = 5;
 
     private static final String COL_MOD                 = "Mod";
-    private static final String COL_AUTHOR              = "Author";
-    private static final String COL_UPDATED             = "Updated";
-    private static final String COL_STEAM_BAN           = "Steam ban status";
-    private static final String COL_ALLOW               = "Allow";
-    private static final String COL_TRUST_AUTHOR        = "Trust author";
-    private static final String TRUST_AUTHOR_TOOLTIP    = "Signed mods by that author can be auto-allowed while the signature remains valid and the mod is not banned.";
+    private static final String COL_AUTHOR              = "Autor";
+    private static final String COL_UPDATED             = "Atualizado";
+    private static final String COL_STEAM_BAN           = "Banimento na Steam";
+    private static final String COL_ALLOW               = "Permitir";
+    private static final String COL_TRUST_AUTHOR        = "Confiar no autor";
+    private static final String TRUST_AUTHOR_TOOLTIP    = "Mods assinados por esse autor podem ser aprovados automaticamente enquanto a assinatura for válida e o mod estiver disponível na Steam.";
     private static final String WATERMARK_ICON_RESOURCE = "zb_icon.png";
 
     private static IconTexture watermarkIcon;
@@ -143,14 +144,14 @@ final class ImguiApprovalDialog {
                 0.5f,
                 0.5f);
         ImGui.pushStyleVar(ImGuiStyleVar.WindowTitleAlign, 0.5f, 0.5f);
-        boolean visible = ImGui.begin("ZombieBuddy Java Mod Approval", open, ImGuiWindowFlags.NoCollapse);
+        boolean visible = ImGui.begin(ZombieBuddy.DISPLAY_NAME + " | Aprovação de mods Java", open, ImGuiWindowFlags.NoCollapse);
         ImGui.popStyleVar();
         if (!visible) {
             ImGui.end();
             return;
         }
         drawWindowIconOverlay();
-        centeredText("Review each Java mod before allowing it to load.");
+        centeredText("Revise cada mod Java antes de permitir o carregamento.");
         ImGui.separator();
 
         if (ImGui.beginChild("##zb-imgui-approval-scroll", 0.0f, scaled(TABLE_SCROLL_H), true)) {
@@ -176,10 +177,10 @@ final class ImguiApprovalDialog {
     }
 
     private void drawBottomActions() {
-        String forceDialogHint = "Hold Shift during game load to force-show this dialog";
-        String persistLabel = "Save decisions to disk (persist across game launches)";
-        String persistTooltip = "When disabled, choices apply only to this game launch.";
-        String cancelLabel = "Cancel";
+        String forceDialogHint = "Mantenha Shift pressionado durante o carregamento para abrir esta janela";
+        String persistLabel = "Salvar decisões para as próximas sessões";
+        String persistTooltip = "Com a opção desativada, as escolhas valem só nesta sessão.";
+        String cancelLabel = "Cancelar";
         String okLabel = "OK";
 
         float spacing       = ImGui.getStyle().getItemSpacingX();
@@ -203,7 +204,7 @@ final class ImguiApprovalDialog {
 
         ImGui.setCursorPos(leftX, textY);
         ImGui.textDisabled(forceDialogHint);
-        showTooltipIfHovered("Shows the approval dialog even for previously approved Java mods.");
+        showTooltipIfHovered("Exibe a janela também para mods Java já aprovados.");
 
         ImGui.setCursorPos(persistX, persistY);
         ImGui.text(persistLabel);
@@ -216,7 +217,7 @@ final class ImguiApprovalDialog {
         ImGui.setCursorPosY(buttonY);
         ImGui.setCursorPosX(Math.max(ImGui.getCursorPosX(), ImGui.getWindowWidth() - rightPad - buttonRowW));
         boolean cancelClicked = clickableButton(cancelLabel, cancelW, buttonH);
-        showTooltipIfHovered("deny all pending Java mods");
+        showTooltipIfHovered("Bloquear todos os mods Java pendentes");
 
         if (cancelClicked) {
             result.compareAndSet(null, denyAll(entries));
@@ -369,10 +370,10 @@ final class ImguiApprovalDialog {
             return !Utils.isBlank(e.zbs.notice()) ? e.zbs.notice() : e.zbs.authorSteamId().toString();
         }
         if (e.zbs.invalid()) {
-            return "No";
+            return "Não";
         }
         if (e.zbs.unsigned()) {
-            return "(unsigned)";
+            return "(sem assinatura)";
         }
         return "?";
     }
@@ -384,7 +385,7 @@ final class ImguiApprovalDialog {
     private static float steamBanColumnContentWidth() {
         return Math.max(
                 ImGui.calcTextSize(COL_STEAM_BAN).x,
-                ImGui.calcTextSize("Unknown").x);
+                ImGui.calcTextSize("Desconhecido").x);
     }
 
     private float allowColumnContentWidth() {
@@ -490,14 +491,14 @@ final class ImguiApprovalDialog {
             return;
         }
         if (e.zbs.invalid()) {
-            cellCenteredTextColored(1.0f, 0.25f, 0.25f, 1.0f, "Invalid signature");
+            cellCenteredTextColored(1.0f, 0.25f, 0.25f, 1.0f, "Assinatura inválida");
             if (!Utils.isBlank(e.zbs.notice())) {
                 showTooltipIfHovered(e.zbs.notice()); // should be called after text draw
             }
             return;
         }
         if (e.zbs.unsigned()) {
-            cellCenteredDisabledText("(unsigned)");
+            cellCenteredDisabledText("(sem assinatura)");
             return;
         }
         cellCenteredText("?");
@@ -505,9 +506,9 @@ final class ImguiApprovalDialog {
 
     private void drawSteamBan(JarBatchApprovalProtocol.Entry e) {
         if (e.steamBan != null) {
-            cellCenteredTextColored(1.0f, 0.25f, 0.25f, 1.0f, "Yes");
+            cellCenteredTextColored(1.0f, 0.25f, 0.25f, 1.0f, "Sim");
         } else {
-            cellCenteredTextColored(STEAM_BAN_NO, "No");
+            cellCenteredTextColored(STEAM_BAN_NO, "Não");
         }
         if (e.steamBan != null && !Utils.isBlank(e.steamBan.reason())) {
             showTooltipIfHovered(e.steamBan.reason());
@@ -555,11 +556,11 @@ final class ImguiApprovalDialog {
         centerNextItem(rowW);
         ImGui.beginDisabled(!interactive);
         try {
-            if (clickableCheckboxValue("##allow-yes-" + index, allow[index].get(), "Yes", ALLOW_CHECK_MARK)) {
+            if (clickableCheckboxValue("##allow-yes-" + index, allow[index].get(), "Sim", ALLOW_CHECK_MARK)) {
                 allow[index].set(true);
             }
             ImGui.sameLine();
-            if (clickableCrossCheckbox("##allow-no-" + index, !allow[index].get(), "No")) {
+            if (clickableCrossCheckbox("##allow-no-" + index, !allow[index].get(), "Não")) {
                 allow[index].set(false);
             }
         } finally {
@@ -878,19 +879,19 @@ final class ImguiApprovalDialog {
 
     private String trustAuthorDisabledTooltip(JarBatchApprovalProtocol.Entry e) {
         if (e.steamBan != null) {
-            return "Cannot trust author: this mod has a Steam ban.";
+            return "Este mod está banido na Steam.";
         }
         if (e.zbs.authorSteamId() != null && authorsWithBannedMods.contains(e.zbs.authorSteamId().toString())) {
-            return "Cannot trust author: they have a banned mod in this batch.";
+            return "O autor tem um mod banido nesta lista.";
         }
         if (e.zbs.invalid()) {
-            return "Cannot trust author: signature is invalid.";
+            return "A assinatura é inválida.";
         }
         if (e.zbs.unsigned()) {
-            return "Cannot trust author: mod is unsigned.";
+            return "O mod está sem assinatura.";
         }
         if (e.zbs.authorSteamId() == null) {
-            return "Cannot trust author: signature has no author SteamID.";
+            return "A assinatura está sem o SteamID do autor.";
         }
         return "";
     }

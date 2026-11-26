@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.CodeSource;
+import java.security.ProtectionDomain;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -48,7 +51,8 @@ final class ModJarInjector {
     }
 
     /** Define patch jars in the ZombieBuddy loader to keep patch/helper static state single. */
-    static ClassLoader injectMerged(TransformedJar jar, Instrumentation instrumentation) throws IOException {
+    static ClassLoader injectMerged(TransformedJar jar, Path sourceJar, Instrumentation instrumentation)
+            throws IOException {
         ClassLoader parent = parentLoader();
         if (!ClassInjector.UsingUnsafe.isAvailable()) {
             Logger.error("ClassInjector.UsingUnsafe not available; cannot define transformed jar in " + parent);
@@ -66,7 +70,12 @@ final class ModJarInjector {
         }
 
         if (!toInject.isEmpty()) {
-            Map<String, Class<?>> injected = new ClassInjector.UsingUnsafe(parent).injectRaw(inDefinitionOrder(toInject));
+            // External mods may locate sibling Lua and assets through their original JAR's CodeSource.
+            ClassInjector injector = sourceJar == null
+                    ? new ClassInjector.UsingUnsafe(parent)
+                    : new ClassInjector.UsingUnsafe(parent, new ProtectionDomain(
+                            new CodeSource(sourceJar.toUri().toURL(), (Certificate[]) null), null, parent, null));
+            Map<String, Class<?>> injected = injector.injectRaw(inDefinitionOrder(toInject));
             Logger.debug("Defined " + injected.size() + " transformed classes in " + parent);
         }
 

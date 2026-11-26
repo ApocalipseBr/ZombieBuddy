@@ -395,7 +395,7 @@ public class Loader {
             if (!nextConfig.equals(g_config)) {
                 g_config = nextConfig;
                 g_configDirty = true;
-                Watermark.setMidLine("Preload mod \"" + id + "\" added/updated. Restart recommended.");
+                Watermark.setMidLine("Mod \"" + id + "\" adicionado ao pré-carregamento. Reinicie o jogo.");
             }
         }
 
@@ -443,6 +443,7 @@ public class Loader {
 
         for (Map.Entry<String, Config.PreloadMod> e : g_config.preload_mods().entrySet()) {
             String id = e.getKey();
+            if (LauncherModTrust.SESSION.manages(id)) continue;
             Config.PreloadMod preloadMod = e.getValue();
             String javaPkgName = JavaModInfo.javaPkgNameFrom(preloadMod.infPath());
             if (Utils.isBlank(javaPkgName)) {
@@ -520,17 +521,7 @@ public class Loader {
             Logger.error("JAR does not contain package " + packageName + ": " + jarPath);
             return false;
         }
-        if (approvedHash != null) {
-            String currentHash = Utils.sha256Hex(jarPath);
-            if (!approvedHash.equals(currentHash)) {
-                Logger.error("SECURITY: JAR hash changed between approval and load for "
-                    + jarPath + " — expected " + approvedHash + ", got " + currentHash
-                    + ". Aborting load.");
-                return false;
-            }
-        }
-
-        return transformAndLoadJar(jarPath, packageName, phase, null);
+        return transformAndLoadJar(jarPath, packageName, phase, null, approvedHash);
     }
 
     /** Load a patch jar bundled as a classpath resource inside {@code ZombieBuddy.jar}. */
@@ -560,20 +551,24 @@ public class Loader {
             return false;
         }
 
-        return transformAndLoadJar(cacheKey, packageName, phase, jarBytes);
+        return transformAndLoadJar(cacheKey, packageName, phase, jarBytes, null);
     }
 
     /** Transform a patch jar and define its classes on a mod {@link ClassLoader}. Cached per {@code cacheKey}. */
-    static boolean transformAndLoadJar(Path cacheKey, String packageName, Phase phase, byte[] jarBytes) {
+    private static boolean transformAndLoadJar(Path cacheKey, String packageName, Phase phase, byte[] jarBytes,
+                                               String approvedHash) {
         Logger.debug("Loader.transformAndLoadJar", packageName, phase);
         ClassLoader modLoader = g_mod_loaders.get(cacheKey);
         if (modLoader == null) {
             try {
-                TransformedJar transformed = jarBytes != null
-                        ? Pipeline.transformPatchJar(jarBytes, packageName)
-                        : Pipeline.transformPatchJar(cacheKey, packageName);
+                byte[] bytes = jarBytes != null ? jarBytes : Files.readAllBytes(cacheKey);
+                if (approvedHash != null && !approvedHash.equals(Utils.sha256Hex(bytes))) {
+                    Logger.error("O JAR mudou após a aprovação e não será carregado: " + cacheKey);
+                    return false;
+                }
+                TransformedJar transformed = Pipeline.transformPatchJar(bytes, packageName);
                 modLoader = shouldMergePatchJar(cacheKey, jarBytes)
-                        ? ModJarInjector.injectMerged(transformed, g_instrumentation)
+                        ? ModJarInjector.injectMerged(transformed, jarBytes == null ? cacheKey : null, g_instrumentation)
                         : ModJarInjector.inject(transformed);
                 g_mod_loaders.put(cacheKey, modLoader);
                 g_transformed_jars.put(cacheKey, transformed);
@@ -598,7 +593,7 @@ public class Loader {
 
     /** Transform {@code jarPath} and define its classes on a mod {@link ClassLoader}. Cached per canonical jar path. */
     static boolean transformAndLoadJar(Path jarPath, String packageName, Phase phase) {
-        return transformAndLoadJar(jarPath, packageName, phase, null);
+        return transformAndLoadJar(jarPath, packageName, phase, null, null);
     }
 
     private static byte[] readResourceBytes(String resourceName) {
@@ -699,7 +694,7 @@ public class Loader {
                 if( g_prev_modSet.contains(mod_id) && !g_curr_modSet.contains(mod_id) ) {
                     Logger.info("Preload mod '" + mod_id + "' was removed from the default mod list; removing from preload.");
                     PreloadMods.remove(mod_id);
-                    Watermark.setMidLine("Preload mod \"" + mod_id + "\" disabled. Restart the game to deactivate it.");
+                    Watermark.setMidLine("Pré-carregamento do mod \"" + mod_id + "\" desativado. Reinicie o jogo.");
                 }
             }
         }
@@ -788,7 +783,7 @@ public class Loader {
         // Pre-compute per-mod context to avoid duplicate work in prompt and load loops
         record ModCtx(String modId, Path jarPath, String hash, WorkshopItemID workshopItemId,
                       SteamWorkshop.ItemDetails workshopDetails, SteamWorkshop.BanInfo banInfo, boolean steamBanned,
-                      ZBSVerifier.CheckResult zbsResult) {}
+                      ZBSVerifier.CheckResult zbsResult, boolean launcherManaged, boolean launcherApproved) {}
         List<ModCtx> modContexts = new ArrayList<>();
 
         for (int i = 0; i < jModInfos.size(); i++) {
@@ -802,7 +797,11 @@ public class Loader {
                 ? new SteamWorkshop.BanInfo(null, "Workshop id not found in mod path.")
                 : (workshopDetails != null ? workshopDetails.ban() : null);
             boolean steamBanned = banInfo != null && Boolean.TRUE.equals(banInfo.status());
-            modContexts.add(new ModCtx(modId, jarPath, hash, workshopItemId, workshopDetails, banInfo, steamBanned, zbsCheck(jarPath, hash, workshopItemId, zbsCtx)));
+            boolean launcherManaged = LauncherModTrust.SESSION.manages(modId);
+            boolean launcherApproved = launcherManaged
+                    && LauncherModTrust.SESSION.approves(modId, jarPath, hash, workshopItemId, Utils.getCachePath());
+            modContexts.add(new ModCtx(modId, jarPath, hash, workshopItemId, workshopDetails, banInfo, steamBanned,
+                    zbsCheck(jarPath, hash, workshopItemId, zbsCtx), launcherManaged, launcherApproved));
         }
         for (ModCtx ctx : modContexts) {
             untrustAuthorForBannedMod(
@@ -830,7 +829,7 @@ public class Loader {
                 if (structuralOnlySkip.get(i)) continue;;
 
                 ModCtx ctx = modContexts.get(i);
-                if (ctx.hash == null) continue;
+                if (ctx.hash == null || ctx.launcherManaged) continue;
 
                 JavaModInfo jModInfo = jModInfos.get(i);
                 Date date = null;
@@ -896,14 +895,14 @@ public class Loader {
             }
             if (!batchEntries.isEmpty()) {
                 if (g_hasDoLoadingText) {
-                    GameWindow.DoLoadingText("Waiting for Java mods approval…");
+                    GameWindow.DoLoadingText("Aguardando aprovação dos mods Java…");
                 }
                 List<JarBatchApprovalProtocol.Entry> decided = batchEntries;
                 try {
                     decided = approvalFrontend().approvePendingMods(batchEntries);
                 } finally {
                     if (g_hasDoLoadingText) {
-                        GameWindow.DoLoadingText("Loading Mods");
+                        GameWindow.DoLoadingText("Carregando mods…");
                     }
                 }
                 applyBatchApprovalLines(decided, approvals);
@@ -946,7 +945,11 @@ public class Loader {
             }
 
             // Enforce Java JAR policy for new/changed binaries.
-            if (!shouldSkip && !isJarAllowedByPolicy(ctx.modId, jModInfo, approvals, ctx.hash)) {
+            if (!shouldSkip && ctx.launcherManaged && !ctx.launcherApproved) {
+                shouldSkip = true;
+                skipReason = " (JAR do Viewpoint não corresponde ao verificado pelo launcher)";
+            }
+            if (!shouldSkip && !ctx.launcherManaged && !isJarAllowedByPolicy(ctx.modId, jModInfo, approvals, ctx.hash)) {
                 shouldSkip = true;
                 skipReason = " (blocked by policy=" + g_jarPolicy + ", modId=" + ctx.modId + ")";
             }
@@ -968,8 +971,8 @@ public class Loader {
             if (canonicalJarPath != null) {
                 Boolean decision = null;
                 if (ctx.hash != null) {
-                    decision = approvals.get(ctx.hash);
-                    if (isDecisionStored(ctx.hash, decision)) {
+                    decision = ctx.launcherApproved ? Boolean.TRUE : approvals.get(ctx.hash);
+                    if (!ctx.launcherManaged && isDecisionStored(ctx.hash, decision)) {
                         flags = flags.with(MF_PERSIST);
                     }
                 }
@@ -1031,6 +1034,9 @@ public class Loader {
         // Load only the mods that should be loaded
         for (int i = 0; i < jModInfos.size(); i++) {
             if (!shouldSkipList.get(i)) {
+                if (modContexts.get(i).launcherApproved) {
+                    Logger.info(modContexts.get(i).modId + ": mod Java verificado pelo launcher.");
+                }
                 loadJar(jModInfos.get(i).jarPath(), jModInfos.get(i).javaPkgName(), modContexts.get(i).hash, Phase.MAIN);
             }
         }

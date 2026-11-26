@@ -9,6 +9,7 @@ import me.zed_0xff.zombie_buddy.JarBatchApprovalProtocol;
 import me.zed_0xff.zombie_buddy.Logger;
 import me.zed_0xff.zombie_buddy.Reflect;
 import me.zed_0xff.zombie_buddy.Utils;
+import me.zed_0xff.zombie_buddy.ZombieBuddy;
 import zombie.core.Core;
 import zombie.core.GameVersion;
 
@@ -18,7 +19,7 @@ import zombie.core.GameVersion;
  */
 public final class TinyfdModApprovalFrontend implements ModApprovalFrontend {
 
-    private static final String DIALOG_TITLE = "ZombieBuddy Java mod approval";
+    private static final String DIALOG_TITLE = ZombieBuddy.DISPLAY_NAME + " | Aprovação de mods Java";
     private static final String DATE_FORMAT = "yyyy-MM-dd";
 
     @Override
@@ -39,11 +40,11 @@ public final class TinyfdModApprovalFrontend implements ModApprovalFrontend {
         if (e.zbs.invalid()) {
             String note = !Utils.isBlank(e.zbs.notice())
                 ? e.zbs.notice()
-                : "Invalid ZBS — load will be denied.";
+                : "A assinatura ZBS é inválida.";
             tinyfdYesNo(
-                "ZBS invalid — this Java mod cannot be loaded.\n\n"
+                "O mod Java foi bloqueado porque a assinatura ZBS é inválida.\n\n"
                     + note
-                    + "\n\nIt will be denied."
+                    + "\n\nEste mod será bloqueado."
             );
             return false;
         }
@@ -57,13 +58,13 @@ public final class TinyfdModApprovalFrontend implements ModApprovalFrontend {
                 + "\n\n";
         }
         Boolean allow = tinyfdYesNo(
-            "Allow Java mod to load?\n\n"
+            "Permitir o carregamento do mod Java?\n\n"
                 + zbsLine
                 + "Mod: " + e.modId + "\n\n"
                 + "JAR: " + e.jarAbsolutePath + "\n\n"
-                + "Modified: " + modified + "\n\n"
+                + "Modificado em " + modified + "\n\n"
                 + "SHA-256: " + e.sha256 + "\n\n"
-                + "Only allow if you trust this mod source."
+                + "Permita apenas se confiar na origem deste mod."
         );
         if (allow == null) {
             return false;
@@ -73,17 +74,17 @@ public final class TinyfdModApprovalFrontend implements ModApprovalFrontend {
 
     private static String zbsStatus(JarBatchApprovalProtocol.Entry e) {
         if (e.zbs.valid()) {
-            return "valid";
+            return "válida";
         }
         if (e.zbs.invalid()) {
-            return "invalid";
+            return "inválida";
         }
-        return "unsigned";
+        return "sem assinatura";
     }
 
     private static String formatDate(Date date) {
         if (date == null) {
-            return "<unknown>";
+            return "<desconhecido>";
         }
         return new SimpleDateFormat(DATE_FORMAT, Locale.ROOT).format(date);
     }

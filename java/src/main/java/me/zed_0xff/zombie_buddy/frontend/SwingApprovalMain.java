@@ -8,6 +8,7 @@ import me.zed_0xff.zombie_buddy.JarBatchApprovalProtocol;
 import me.zed_0xff.zombie_buddy.KnownAuthors;
 import me.zed_0xff.zombie_buddy.SteamWorkshop;
 import me.zed_0xff.zombie_buddy.Utils;
+import me.zed_0xff.zombie_buddy.ZombieBuddy;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -136,7 +137,7 @@ public final class SwingApprovalMain {
             }
         }
         final boolean showTrustColumn = shouldShowTrustColumn(entries, authorsWithBannedMods);
-        JFrame frame = new JFrame("ZombieBuddy — Java mod approval");
+        JFrame frame = new JFrame(ZombieBuddy.DISPLAY_NAME + " | Aprovação de mods Java");
         frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         frame.addWindowListener(new WindowAdapter() {
             @Override
@@ -148,7 +149,7 @@ public final class SwingApprovalMain {
         JPanel root = new JPanel(new BorderLayout(8, 8));
         root.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        JLabel intro = new JLabel("<html>For each mod choose <b>Yes</b> (load JAR) or <b>No</b> (block).</html>");
+        JLabel intro = new JLabel("<html>Para cada mod, escolha <b>Sim</b> para carregar ou <b>Não</b> para bloquear.</html>");
         root.add(intro, BorderLayout.NORTH);
 
         JPanel grid = new JPanel(new GridBagLayout());
@@ -161,11 +162,11 @@ public final class SwingApprovalMain {
         Font bold = base != null ? base.deriveFont(Font.BOLD) : null;
 
         JLabel hName     = new JLabel("Mod");
-        JLabel hAuthor   = new JLabel("Author");
-        JLabel hUpdated  = new JLabel("Updated");
-        JLabel hSteamBan = new JLabel("<html><center>Steam<br/>ban status</center></html>");
-        JLabel hTrust    = new JLabel("<html><center>Trust<br/>author</center></html>");
-        JLabel hAllow    = new JLabel("Allow");
+        JLabel hAuthor   = new JLabel("Autor");
+        JLabel hUpdated  = new JLabel("Atualizado");
+        JLabel hSteamBan = new JLabel("<html><center>Banimento<br/>na Steam</center></html>");
+        JLabel hTrust    = new JLabel("<html><center>Confiar<br/>no autor</center></html>");
+        JLabel hAllow    = new JLabel("Permitir");
 
         hUpdated.setHorizontalAlignment(SwingConstants.CENTER);
         hSteamBan.setHorizontalAlignment(SwingConstants.CENTER);
@@ -279,7 +280,7 @@ public final class SwingApprovalMain {
             } else if (zbsNo) {
                 String fullNotice = !Utils.isBlank(e.zbs.notice())
                     ? e.zbs.notice()
-                    : "Invalid signature — JAR may have been tampered with.";
+                    : "Assinatura inválida. O JAR pode ter sido alterado.";
                 int nl = fullNotice.indexOf('\n');
                 String shortNotice = nl >= 0 ? fullNotice.substring(0, nl).trim() : fullNotice;
                 JLabel warn = new JLabel("<html><font color=\"#b00000\">" + escapeHtml(
@@ -292,7 +293,7 @@ public final class SwingApprovalMain {
                 applyRowBackground(warn, rowBg);
                 authorCell.add(warn);
             } else if (zbsUnsigned) {
-                JLabel u = new JLabel("<html><i>(unsigned)</i></html>");
+                JLabel u = new JLabel("<html><i>(sem assinatura)</i></html>");
                 u.setAlignmentX(Component.LEFT_ALIGNMENT);
                 applyRowBackground(u, rowBg);
                 authorCell.add(u);
@@ -315,7 +316,7 @@ public final class SwingApprovalMain {
             c.gridx = COL_STEAM_BAN;
             c.weightx = W_STEAM_BAN;
             c.fill = GridBagConstraints.BOTH;
-            JLabel banStatusLab = new JLabel(steamBanYes ? "Yes" : "No");
+            JLabel banStatusLab = new JLabel(steamBanYes ? "Sim" : "Não");
             banStatusLab.setHorizontalAlignment(SwingConstants.CENTER);
             if (!steamBanYes) {
                 banStatusLab.setForeground(STEAM_BAN_NO);
@@ -327,8 +328,8 @@ public final class SwingApprovalMain {
             grid.add(banStatusLab, c);
 
             boolean defaultYes = Boolean.TRUE.equals(e.decision);
-            JRadioButton yesB = new JRadioButton("Yes", defaultYes);
-            JRadioButton noB = new JRadioButton("No", !defaultYes);
+            JRadioButton yesB = new JRadioButton("Sim", defaultYes);
+            JRadioButton noB = new JRadioButton("Não", !defaultYes);
             forceDisableAllow[i] = zbsNo || steamBanYes;
             if (forceDisableAllow[i]) {
                 yesB.setEnabled(false);
@@ -357,7 +358,7 @@ public final class SwingApprovalMain {
             trustCb.setEnabled(canTrustThisAuthor);
             if (!canTrustThisAuthor && showTrustColumn && zbsYes && !zbsSteamId.isEmpty()
                     && authorsWithBannedMods.contains(zbsSteamId)) {
-                trustCb.setToolTipText("Cannot trust author: they have a banned mod in this batch.");
+                trustCb.setToolTipText("O autor tem um mod banido nesta lista.");
             }
             applyRowBackground(trustCb, rowBg);
             trustChecks[i] = trustCb;
@@ -390,14 +391,14 @@ public final class SwingApprovalMain {
         root.add(scroll, BorderLayout.CENTER);
 
         JLabel trustNotice = new JLabel(
-            "<html><small><i>\"Trust author\" means all mods by that author are auto-allowed while their digital signature remains valid and the mod is not banned.</i></small></html>");
+            "<html><small><i>\"Confiar no autor\" aprova automaticamente os mods assinados por esse autor enquanto a assinatura for válida e o mod estiver disponível na Steam.</i></small></html>");
         trustNotice.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JCheckBox savePersist = new JCheckBox("Save decisions to disk (persist across game launches)", false);
+        JCheckBox savePersist = new JCheckBox("Salvar decisões para as próximas sessões", false);
         savePersist.setHorizontalTextPosition(SwingConstants.LEADING);
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton ok = new JButton("OK");
-        JButton cancel = new JButton("Cancel");
+        JButton cancel = new JButton("Cancelar");
         buttons.add(cancel);
         buttons.add(ok);
         Runnable updateOkEnabled = () -> {
