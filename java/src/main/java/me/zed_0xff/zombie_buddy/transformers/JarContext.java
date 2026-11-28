@@ -48,6 +48,7 @@ public class JarContext implements Closeable {
 
     private final ClassFileLocator    m_origLocator;
     private final TypePool            m_origPool;
+    private final TypeDescription     m_knownTarget;
     private final Map<String, byte[]> m_newClassBytes = new HashMap<>(); // className → new class bytes
 
     private ClassFileLocator          m_curLocator = null;
@@ -64,6 +65,11 @@ public class JarContext implements Closeable {
     }
 
     private JarContext(ClassFileLocator locator) {
+        this(locator, null);
+    }
+
+    private JarContext(ClassFileLocator locator, TypeDescription knownTarget) {
+        m_knownTarget = knownTarget;
         m_origLocator = new Compound(
                 locator,
                 ForClassLoader.ofSystemLoader(),
@@ -94,11 +100,16 @@ public class JarContext implements Closeable {
 
     /** Creates a class context that can also resolve types visible to the class loader that loaded the class. */
     public static JarContext forClass(String className, byte[] classBytes, ClassLoader classLoader) {
+        return forClass(className, classBytes, classLoader, null);
+    }
+
+    /** The instrumented target may already be described even if it has no class resource. */
+    public static JarContext forClass(String className, byte[] classBytes, ClassLoader classLoader, TypeDescription target) {
         ClassFileLocator locator = new Simple(Map.of(className, classBytes));
         if (classLoader != null) {
             locator = new Compound(locator, ForClassLoader.of(classLoader));
         }
-        return new JarContext(locator);
+        return new JarContext(locator, target);
     }
 
     /** Keys are JVM binary class names ({@link Class#getName()}). {@link TypePool} resolves strictly from this map plus the class-loader leg; no live {@link JarFile}. */
@@ -248,6 +259,9 @@ public class JarContext implements Closeable {
     }
 
     public TypeDescription getOrigTypeDesc(String s) {
+        if (m_knownTarget != null && m_knownTarget.getName().equals(s)) {
+            return m_knownTarget;
+        }
         return getTypeDesc(s, m_origPool);
     }
 

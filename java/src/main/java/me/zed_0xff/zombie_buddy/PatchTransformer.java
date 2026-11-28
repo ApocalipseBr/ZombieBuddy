@@ -64,7 +64,7 @@ final class PatchTransformer {
      * Populates {@link MethodHandle}/{@link VarHandle} fields on {@code patchClass}.
      * Returns null if a non-optional handle cannot be resolved (caller should drop the patch).
      */
-    public static Class<?> preparePatch(Class<?> patchClass, TypeDescription ignoredTd) {
+    public static Class<?> preparePatch(Class<?> patchClass, TypeDescription targetType) {
         Patch patchAnn0 = patchClass.getAnnotation(Patch.class);
         String targetCls0 = (patchAnn0 != null) ? patchAnn0.className() : "";
         String prevClass = g_transformingClass.get();
@@ -74,7 +74,7 @@ final class PatchTransformer {
             g_transformingLoader.set(patchClass.getClassLoader());
         }
         try {
-            Class<?> resolved = ensureTransformed(patchClass);
+            Class<?> resolved = ensureTransformed(patchClass, targetType);
             if (resolved == null) return null;
 
             return preparePatchInner(resolved, resolved.getAnnotation(Patch.class));
@@ -109,7 +109,7 @@ final class PatchTransformer {
         return null;
     }
 
-    private static Class<?> ensureTransformed(Class<?> patchClass) {
+    private static Class<?> ensureTransformed(Class<?> patchClass, TypeDescription targetType) {
         String className = patchClass.getName();
         Class<?> cached = g_transformedClasses.get(className);
         if (cached != null) {
@@ -128,7 +128,7 @@ final class PatchTransformer {
             }
 
             byte[] transformedBytes;
-            try (JarContext jctx = JarContext.forClass(className, classBytes, patchClass.getClassLoader())) {
+            try (JarContext jctx = JarContext.forClass(className, classBytes, patchClass.getClassLoader(), targetType)) {
                 transformedBytes = Pipeline.patchLoad().transformClass(className, classBytes, jctx);
             } catch (Exception e) {
                 Logger.error("Failed to transform patch class " + className + ": " + e.getMessage());
