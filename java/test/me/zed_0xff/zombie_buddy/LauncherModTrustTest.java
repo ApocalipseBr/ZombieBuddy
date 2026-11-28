@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,6 +29,13 @@ class LauncherModTrustTest {
         assertFalse(trust.approves("Viewpoint", subscribedJar, hash, workshopId, cache));
         assertFalse(trust.approves("Viewpoint", managedJar, hash, new WorkshopItemID(3810302175L), cache));
         assertFalse(new LauncherModTrust(null).manages("Viewpoint"));
+
+        var profile = new LauncherModTrust(
+                "Viewpoint:3809306528:" + hash + ",OtherMod:3810302175:" + hash, List.of("Viewpoint"));
+        assertTrue(profile.manages("Viewpoint", managedFolder.resolve("42/mod.info"), cache));
+        assertTrue(profile.approves("Viewpoint", managedJar, hash, workshopId, cache));
+        assertFalse(profile.manages("Viewpoint", cache.resolve("mods/Viewpoint/42/mod.info"), cache));
+        assertFalse(profile.manages("OtherMod"));
 
         Files.writeString(managedJar, "updated jar");
         assertFalse(trust.approves("Viewpoint", managedJar, Utils.sha256Hex(managedJar), workshopId, cache));

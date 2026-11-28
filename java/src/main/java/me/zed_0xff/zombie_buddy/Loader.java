@@ -797,7 +797,7 @@ public class Loader {
                 ? new SteamWorkshop.BanInfo(null, "Workshop id not found in mod path.")
                 : (workshopDetails != null ? workshopDetails.ban() : null);
             boolean steamBanned = banInfo != null && Boolean.TRUE.equals(banInfo.status());
-            boolean launcherManaged = LauncherModTrust.SESSION.manages(modId);
+            boolean launcherManaged = LauncherModTrust.SESSION.manages(modId, jModInfo.infPath(), Utils.getCachePath());
             boolean launcherApproved = launcherManaged
                     && LauncherModTrust.SESSION.approves(modId, jarPath, hash, workshopItemId, Utils.getCachePath());
             modContexts.add(new ModCtx(modId, jarPath, hash, workshopItemId, workshopDetails, banInfo, steamBanned,
@@ -947,7 +947,7 @@ public class Loader {
             // Enforce Java JAR policy for new/changed binaries.
             if (!shouldSkip && ctx.launcherManaged && !ctx.launcherApproved) {
                 shouldSkip = true;
-                skipReason = " (JAR do Viewpoint não corresponde ao verificado pelo launcher)";
+                skipReason = " (JAR does not match the copy verified by the launcher)";
             }
             if (!shouldSkip && !ctx.launcherManaged && !isJarAllowedByPolicy(ctx.modId, jModInfo, approvals, ctx.hash)) {
                 shouldSkip = true;

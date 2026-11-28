@@ -28,19 +28,26 @@ public final class LauncherModTemplate {
         return System.getProperty(MODS_PROPERTY) != null || isViewpoint();
     }
 
-    public static List<String> forSession(List<String> mods) {
+    static List<String> configuredModIds() {
         String configured = System.getProperty(MODS_PROPERTY);
-        if (GameServer.server || (configured == null && !isViewpoint())) {
+        if (configured == null) {
+            return isViewpoint() ? MOD_IDS : List.of();
+        }
+        return Arrays.stream(configured.split(","))
+                .map(String::strip).filter(id -> !id.isEmpty()).distinct().toList();
+    }
+
+    public static List<String> forSession(List<String> mods) {
+        List<String> required = configuredModIds();
+        if (GameServer.server || required.isEmpty()) {
             return mods;
         }
         boolean localList = mods == ActiveMods.getById("default").getMods()
                 || mods == ActiveMods.getById("currentGame").getMods();
-        if (!localList && (configured == null || !GameClient.client)) {
+        if (!localList && (System.getProperty(MODS_PROPERTY) == null || !GameClient.client)) {
             return mods;
         }
 
-        List<String> required = configured == null ? MOD_IDS : Arrays.stream(configured.split(","))
-                .map(String::strip).filter(id -> !id.isEmpty()).distinct().toList();
         var available = new ArrayList<String>();
         for (String modId : required) {
             // The ApocBR pack also ran on multiplayer clients before this moved to ZombieBuddy.
