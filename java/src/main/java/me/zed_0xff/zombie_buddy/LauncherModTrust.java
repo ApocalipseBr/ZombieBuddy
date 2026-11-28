@@ -16,6 +16,8 @@ import me.zed_0xff.zombie_buddy.SteamWorkshop.WorkshopItemID;
 /** Session-only approval for Java mods verified by the Apocalipse BR launcher. */
 final class LauncherModTrust {
     private static final long VIEWPOINT_WORKSHOP_ID = 3809306528L;
+    private static final String TREE_FLICKER_MOD = "ViewpointDisableIsometricUpkeep";
+    private static final WorkshopItemID TREE_FLICKER_WORKSHOP_ID = new WorkshopItemID(3842290180L);
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
     private static final Pattern APPROVAL = Pattern.compile("([^,:]+):([0-9]{1,18}):([0-9a-f]{64})");
     private static final String HASH_PROPERTY = "apocbr.launcher.viewpoint.java.sha256";
@@ -73,6 +75,17 @@ final class LauncherModTrust {
         return modInfo != null && cache != null
                 && modInfo.toAbsolutePath().normalize()
                         .startsWith(LauncherModTemplate.stagedMods(cache.toAbsolutePath().normalize()).resolve(modId));
+    }
+
+    // The 2.x compatibility transformer was verified against this patch's legacy annotations.
+    boolean allowsTreeFlickerLegacyVersion(Path modInfo, Path jar, Path cache) {
+        if (!manages(TREE_FLICKER_MOD, modInfo, cache) || !Files.isRegularFile(jar)) {
+            return false;
+        }
+        Path modRoot = LauncherModTemplate.stagedMods(cache).resolve(TREE_FLICKER_MOD);
+        WorkshopItemID workshopId = JavaModInfo.workshopItemIdFromWorkshopTxtIn(modRoot);
+        return TREE_FLICKER_WORKSHOP_ID.equals(workshopId)
+                && approves(TREE_FLICKER_MOD, jar, Utils.sha256Hex(jar), workshopId, cache);
     }
 
     boolean approves(String modId, Path jar, String hash, WorkshopItemID workshopId, Path cache) {

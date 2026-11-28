@@ -40,4 +40,24 @@ class LauncherModTrustTest {
         Files.writeString(managedJar, "updated jar");
         assertFalse(trust.approves("Viewpoint", managedJar, Utils.sha256Hex(managedJar), workshopId, cache));
     }
+
+    @Test
+    void treeFlickerVersionExceptionRequiresTheApprovedStagedCopy(@TempDir Path cache) throws IOException {
+        String modId = "ViewpointDisableIsometricUpkeep";
+        Path modRoot = LauncherModTemplate.stagedMods(cache).resolve(modId);
+        Path modInfo = Files.createDirectories(modRoot.resolve("42")).resolve("mod.info");
+        Files.writeString(modRoot.resolve("workshop.txt"), "id=3842290180\n");
+        Path jar = Files.writeString(modInfo.resolveSibling("patch.jar"), "approved jar");
+        Path playerJar = Files.copy(jar, cache.resolve("patch.jar"));
+        var trust = new LauncherModTrust(modId + ":3842290180:" + Utils.sha256Hex(jar), List.of(modId));
+
+        assertTrue(trust.allowsTreeFlickerLegacyVersion(modInfo, jar, cache));
+        assertFalse(trust.allowsTreeFlickerLegacyVersion(cache.resolve("mods/mod.info"), jar, cache));
+        assertFalse(trust.allowsTreeFlickerLegacyVersion(modInfo, playerJar, cache));
+        Files.writeString(modRoot.resolve("workshop.txt"), "id=3809306528\n");
+        assertFalse(trust.allowsTreeFlickerLegacyVersion(modInfo, jar, cache));
+        Files.writeString(modRoot.resolve("workshop.txt"), "id=3842290180\n");
+        Files.writeString(jar, "modified jar");
+        assertFalse(trust.allowsTreeFlickerLegacyVersion(modInfo, jar, cache));
+    }
 }

@@ -172,6 +172,7 @@ record JavaModInfo(
         boolean isServer = Utils.isServer();
         boolean anyPlatformMatch = false;
         JarCandidate versionMatch = null;
+        JarCandidate legacyTreeFlickerMatch = null;
 
         for (JarCandidate candidate : candidates) {
             String jarFilePath = candidate.jarFilePath();
@@ -183,11 +184,21 @@ record JavaModInfo(
                 versionMatch = candidate;
                 break;
             }
+            if (!isServer && legacyTreeFlickerMatch == null
+                    && "2.3.4".equals(candidate.zbVersionMin()) && "2.3.4".equals(candidate.zbVersionMax())
+                    && LauncherModTrust.SESSION.allowsTreeFlickerLegacyVersion(
+                            infPath, jarDir.resolve(jarFilePath), Utils.getCachePath())) {
+                legacyTreeFlickerMatch = candidate;
+            }
         }
 
         if (!anyPlatformMatch) {
             Logger.warn(isServer ? "Skipping client-only mod" : "Skipping server-only mod", infPath);
             return null;
+        }
+        if (versionMatch == null && legacyTreeFlickerMatch != null) {
+            versionMatch = legacyTreeFlickerMatch;
+            Logger.info("Using ZombieBuddy 2.x compatibility for the launcher-verified Tree Flicker Patch.");
         }
         if (versionMatch == null) {
             Logger.error("Skipping mod due to version mismatch", infPath, versionMismatchMessage(candidates));
