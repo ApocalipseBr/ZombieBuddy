@@ -668,16 +668,13 @@ public final class PatchEngine {
             public boolean matches(MethodDescription target) {
                 int targetParamCount = target.getParameters().size();
                 boolean allArgsMatch = false;
-                boolean result = false;
 
                 while (true) {
                     if (noParam && targetParamCount == 0) {
-                        result = true;
-                        break;
+                        return true;
                     }
                     if (strict && noParam && maps.isEmpty() && targetParamCount > 0) {
-                        result = false;
-                        break;
+                        return false;
                     }
 
                     for (int i = 0; i < maps.size(); i++) {
