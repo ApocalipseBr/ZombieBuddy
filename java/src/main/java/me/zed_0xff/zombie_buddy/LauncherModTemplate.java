@@ -2,14 +2,20 @@ package me.zed_0xff.zombie_buddy;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import zombie.gameStates.ChooseGameInfo;
 import zombie.modding.ActiveMods;
+import zombie.network.GameClient;
+import zombie.network.GameServer;
 
 import static me.zed_0xff.zombie_buddy.SteamWorkshop.WorkshopItemID;
 
 public final class LauncherModTemplate {
     private static final List<String> MOD_IDS = List.of("ZombieBuddy", "Viewpoint", "PZVoxelStudioViewpoint");
+    private static final String MODS_PROPERTY = "apocbr.launcher.mods";
+    private static final String APOCBR_PACK = "APOCALISEBR_PACK";
     private static final String VIEWPOINT = "viewpoint";
 
     private LauncherModTemplate() {}
@@ -18,28 +24,49 @@ public final class LauncherModTemplate {
         return VIEWPOINT.equals(System.getProperty("apocbr.launcher.template"));
     }
 
+    static boolean isLauncherSession() {
+        return System.getProperty(MODS_PROPERTY) != null || isViewpoint();
+    }
+
     public static List<String> forSession(List<String> mods) {
-        if (!isViewpoint() || (mods != ActiveMods.getById("default").getMods()
-                && mods != ActiveMods.getById("currentGame").getMods())) {
+        String configured = System.getProperty(MODS_PROPERTY);
+        if (GameServer.server || (configured == null && !isViewpoint())) {
             return mods;
         }
-        for (String modId : MOD_IDS) {
+        boolean localList = mods == ActiveMods.getById("default").getMods()
+                || mods == ActiveMods.getById("currentGame").getMods();
+        if (!localList && (configured == null || !GameClient.client)) {
+            return mods;
+        }
+
+        List<String> required = configured == null ? MOD_IDS : Arrays.stream(configured.split(","))
+                .map(String::strip).filter(id -> !id.isEmpty()).distinct().toList();
+        var available = new ArrayList<String>();
+        for (String modId : required) {
+            // The ApocBR pack also ran on multiplayer clients before this moved to ZombieBuddy.
+            if (!localList && !APOCBR_PACK.equals(modId)) continue;
             if (ChooseGameInfo.getAvailableModDetails(modId) == null) {
-                throw new IllegalStateException("Viewpoint template mod " + modId
+                if (APOCBR_PACK.equals(modId)) {
+                    Logger.warn("Launcher mod " + modId + " is not installed or compatible with this game build.");
+                    continue;
+                }
+                throw new IllegalStateException("Launcher mod " + modId
                         + " is unavailable for this Project Zomboid build.");
             }
+            available.add(modId);
         }
-        return mergeViewpointMods(mods);
+        if (available.isEmpty()) return mods;
+        return localList ? mergeMods(available, mods) : mergeMods(mods, available);
     }
 
     static List<String> mergeViewpointMods(List<String> mods) {
-        var sessionMods = new ArrayList<>(MOD_IDS);
-        for (String mod : mods) {
-            if (!MOD_IDS.contains(mod)) {
-                sessionMods.add(mod);
-            }
-        }
-        return sessionMods;
+        return mergeMods(MOD_IDS, mods);
+    }
+
+    private static List<String> mergeMods(List<String> required, List<String> mods) {
+        var sessionMods = new LinkedHashSet<>(required);
+        sessionMods.addAll(mods);
+        return new ArrayList<>(sessionMods);
     }
 
     static WorkshopItemID workshopItemId(Path modRoot) {

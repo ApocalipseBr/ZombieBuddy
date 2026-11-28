@@ -44,7 +44,7 @@ record JavaModInfo(
         WorkshopItemID id = workshopItemIdFromSteamPath(path);
         if (id != null) return id;
 
-        if (LauncherModTemplate.isViewpoint() && path.getParent() != null) {
+        if (LauncherModTemplate.isLauncherSession() && path.getParent() != null) {
             id = LauncherModTemplate.workshopItemId(path.getParent().getParent());
             if (id != null) return id;
         }
