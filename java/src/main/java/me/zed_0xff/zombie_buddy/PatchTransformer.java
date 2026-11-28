@@ -128,7 +128,7 @@ final class PatchTransformer {
             }
 
             byte[] transformedBytes;
-            try (JarContext jctx = JarContext.forClass(className, classBytes)) {
+            try (JarContext jctx = JarContext.forClass(className, classBytes, patchClass.getClassLoader())) {
                 transformedBytes = Pipeline.patchLoad().transformClass(className, classBytes, jctx);
             } catch (Exception e) {
                 Logger.error("Failed to transform patch class " + className + ": " + e.getMessage());

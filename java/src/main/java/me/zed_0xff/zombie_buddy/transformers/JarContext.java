@@ -92,6 +92,15 @@ public class JarContext implements Closeable {
         return new JarContext(new Simple(Map.of(className, classBytes)));
     }
 
+    /** Creates a class context that can also resolve types visible to the class loader that loaded the class. */
+    public static JarContext forClass(String className, byte[] classBytes, ClassLoader classLoader) {
+        ClassFileLocator locator = new Simple(Map.of(className, classBytes));
+        if (classLoader != null) {
+            locator = new Compound(locator, ForClassLoader.of(classLoader));
+        }
+        return new JarContext(locator);
+    }
+
     /** Keys are JVM binary class names ({@link Class#getName()}). {@link TypePool} resolves strictly from this map plus the class-loader leg; no live {@link JarFile}. */
     public static JarContext forClasses(Map<String, byte[]> binaryNameToBytes) {
         return new JarContext(new Simple(binaryNameToBytes));
